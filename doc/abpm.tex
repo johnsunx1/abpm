@@ -1,0 +1,149 @@
+%\VignetteIndexEntry{abpm Overview}
+%\VignetteDepends{abpm }
+%\VignetteKeywords{abpm }
+%\VignetteKeywords{abpm }
+%\VignetteKeywords{abpm }
+%\VignettePackage{abpm }
+\documentclass[a4paper]{article}
+
+\newcommand{\Rfunction}[1]{{\texttt{#1}}}
+\newcommand{\Robject}[1]{{\texttt{#1}}}
+\newcommand{\Rpackage}[1]{{\textit{#1}}}
+\newcommand{\Rclass}[1]{{\textit{#1}}}
+\newcommand{\Rmethod}[1]{{\textit{#1}}}
+
+\author{Xiaoyong Sun & DavidA James}
+
+\usepackage{/CHBS/apps/R/2.7.0/lib64/R/share/texmf/Sweave}
+\begin{document}
+
+\setkeys{Gin}{width=1\textwidth} 
+
+\title{Quick Guide for abpm Package}
+\maketitle
+
+\tableofcontents
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Introduction}
+Ambulatory blood pressure measurement (ABPM) is a monitoring tool widely used 
+in the research of cardiovascular diseases and drug development.  
+Patients typically wear a portable device for one or more days collecting BP readings
+ about every 10-30 minutes during their daily routines. 
+ This process is then repeated at longer intervals (weeks or months) to assess, 
+ for instance, the effect of therapies on BP. A number of advantages of ABPM over 
+ traditional single BP measurement have been reported in the literature, and they 
+ include the reduction of the so-called "white-coat" bias [1-3], the assessment of 
+ nocturnal BP lowering (so-called "dipping") [3-4], quantification of pharmacological 
+ effects over time [5], distortion of BP circadian rhythms, etc.  
+\section{Data managment section}
+This section includes data cleaning and data preprocessing. Data cleaning is to clean ABPM data
+which is more than 24 hours after dosing, and data preprocessing is to translate date
+object to numeric.
+
+\begin{verbatim}
+date<-abpm.date(s.abp$ABPDBP1N,s.abp$ABPSBP1N, s.abp$ABPSMD1O, s.abp$REA1O, time.abs=T)
+data<-cbind(s.abp, date)
+my.abp<-abpm.clean(data)
+\end{verbatim}
+
+There is also a function to deal with multiple visit: abpm.change. It can
+calculate change among multiple visit.
+\begin{verbatim}
+t<-abpm.change(done.abp$DIFF, done.abp$ABPDBP1N, done.abp$STYSID1A, done.abp$TRTN, done.abp$DOSE, 1)
+\end{verbatim}
+
+\section{Model section}
+This package provides three modeling methods: cosinor model(parametric method),
+loess and local likelihood(nonparametric method).
+\newline
+\newline
+For cosinor model, you can choose single cosinor, double cosinor or triple cosinor,
+\begin{verbatim}
+d1<-done.abp[done.abp$TRTN==1 & done.abp$DOSE==1,]
+fit.single<-abpm.model(d1$DIFF, d1$ABPDBP1N, d1$STYSID1A, d1$TRTN, d1$DOSE, 
+		method=3, nlme=1, cosinor.period=c(24))
+fit.double<-abpm.model(d1$DIFF, d1$ABPDBP1N, d1$STYSID1A, d1$TRTN, d1$DOSE, 
+		method=3, nlme=1, cosinor.period=c(24, 12))
+fit.triple<-abpm.model(d1$DIFF, d1$ABPDBP1N, d1$STYSID1A, d1$TRTN, d1$DOSE, 
+		method=3, nlme=1, cosinor.period=c(24, 12, 6))
+\end{verbatim}
+\newline
+\newline
+Sometime, you may have large data set, and nlme package does not converge well. You can
+switch to lme4 package instead with a option: nlme=2.
+\begin{verbatim}
+fit.lme4<-abpm.model(d1$DIFF, d1$ABPDBP1N, d1$STYSID1A, d1$TRTN, d1$DOSE, 
+		method=3, nlme=2, cosinor.period=c(24, 12, 6))
+
+\end{verbatim}
+The option: cosinor.period is to use control circadian rhythm. for ABPM data,
+we found triple cosinor fits data quite well.
+\newline
+\section{Feature section}
+In this section, 24 hour mean, daytime/nighttime mean, morning surge, smoothness index
+and trough:peak ratio is calculated.
+\begin{verbatim}
+f2<-abpm.feature(done.abp$DIFF, done.abp$ABPDBP1N, done.abp$STYSID1A, done.abp$TRTN, done.abp$DOSE, method="hour")
+\end{verbatim}
+There are a lot of options for this function, such as morning surge, day time, 
+dipper ratio, peak time, and trough time, etc. Users can define it with
+regards to their own protocols.
+
+\section{Subgroup section}
+We have define resonder/nonresponder, high daytime/nightime blood pressure and dipper/non-dipper
+to discern various subgroups. Users can check percent of certain subgroup against threshhold values.
+\begin{verbatim}
+f2<-abpm.feature(done.abp$DIFF, done.abp$ABPDBP1N, done.abp$STYSID1A, done.abp$TRTN, done.abp$DOSE, method="hour")
+\end{verbatim}
+\newline
+\newline
+Users can also visualize these subgroups, and details are demonstrated in next section.
+
+\section{Display section}
+This section includes the following functions:
+display.ind, display.pop, display.model, display.allmodel and display.percent
+\newline
+\newline
+display.ind is to display individual values, such as blood pressure.
+\begin{verbatim}
+display.ind(done.abp$DIFF, done.abp$ABPDBP1N, done.abp$STYSID1A, 
+done.abp$TRTN, done.abp$DOSE, night=c(20,25), type=c("n", "smooth"), main="test",
+xlab="test", span=0.25
+)
+\end{verbatim}
+display.pop is to visualize population based on loess.
+\begin{verbatim}
+display.pop(done.abp$DIFF, done.abp$ABPDBP1N, done.abp$STYSID1A, done.abp$TRTN, 
+ done.abp$DOSE, night=c(20,25), ylim=c(60,120), layout=c(1,3), page=T)
+
+\end{verbatim}
+display.model is to visualize model fit with data.
+\begin{verbatim}
+fit1<-abpm.model(d1$DIFF, d1$ABPDBP1N, d1$STYSID1A, d1$TRTN, d1$DOSE, 
+		method=1, span=0.25)
+display.model(fit1,d1$DIFF, d1$ABPDBP1N, d1$STYSID1A,
+visit=d1$DOSE)
+\end{verbatim}
+display.allmodel is to visualize all model fit with data.
+\begin{verbatim}
+fitlist<-list(fit1=fit1, fit2=fit2, fit3=fit3)
+display.allmodel(fitlist, d1$DIFF, d1$ABPDBP1N,
+ d1$STYSID1A, d1$DOSE)
+\end{verbatim}
+
+display.percent is to visualize subgroup.
+\begin{verbatim}
+proplist<-abpm.percent(done.abp$DIFF, done.abp$ABPDBP1N, done.abp$STYSID1A, done.abp$TRTN,done.abp$DOSE)
+display.percent(proplist, page=T)
+
+\end{verbatim}
+
+
+ 
+
+\end{document}
+
+
+
+
